@@ -4,6 +4,44 @@
 
 Inspired by **Undercover** / **Spyfall** style play: everyone except the impostors sees the same secret word; impostors see the same hint about that word. Roles and reveal order are randomized each session.
 
+## Screenshots
+
+### Main menu
+
+![Main menu: Play and Settings](assets/home.png)
+
+### Saved game preset
+
+Edit players, impostor count, **START** the round, or delete the saved slot.
+
+![Preset screen with START](assets/start.png)
+
+### Remove player
+
+Pick a name to remove from the current roster.
+
+![Remove who? list](assets/remove.png)
+
+### Pass the device
+
+Current player hands the Flipper to the next person; **hold OK** to see the role card.
+
+![Pass device to next player](assets/roles.png)
+
+### Role cards
+
+Crew sees the shared **word**; impostors see a **hint** only. **Short OK** advances to the next player.
+
+| Crew (word) | Impostor (hint) |
+|-------------|-----------------|
+| ![Word card](assets/role1.png) | ![Impostor hint card](assets/role2.png) |
+
+### First speaker
+
+After everyone has seen their role, the app picks who speaks first at random.
+
+![START — first speaker](assets/init.png)
+
 ## Features
 
 - **English** UI by default, **Spanish** second locale (stored on SD).
