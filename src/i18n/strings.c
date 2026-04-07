@@ -29,6 +29,7 @@ static const char *const k_en[ImpostorStrCount] = {
     [ImpostorStrRoleImpostor] = "IMPOSTOR",
     [ImpostorStrRoleHintLabel] = "Hint:",
     [ImpostorStrRoleWordLabel] = "Word:",
+    [ImpostorStrRoleCardFooter] = "Short OK = next",
     [ImpostorStrPresetPlayers] = "Players",
     [ImpostorStrPresetAdd] = "Add player",
     [ImpostorStrPresetRemove] = "Remove player",
@@ -42,7 +43,8 @@ static const char *const k_en[ImpostorStrCount] = {
     [ImpostorStrManageDelete] = "Remove",
     [ImpostorStrManageBack] = "Back",
     [ImpostorStrPresetDeleteSaved] = "Delete saved game",
-    [ImpostorStrCreditsFooter] = "Flipper Zero",
+    [ImpostorStrCreditsRepoLine1] = "https://github.com/endika/",
+    [ImpostorStrCreditsRepoLine2] = "flipper-impostor-game",
 };
 
 static const char *const k_es[ImpostorStrCount] = {
@@ -72,6 +74,7 @@ static const char *const k_es[ImpostorStrCount] = {
     [ImpostorStrRoleImpostor] = "IMPOSTOR",
     [ImpostorStrRoleHintLabel] = "Pista:",
     [ImpostorStrRoleWordLabel] = "Palabra:",
+    [ImpostorStrRoleCardFooter] = "OK corto = siguiente",
     [ImpostorStrPresetPlayers] = "Jugadores",
     [ImpostorStrPresetAdd] = "Anadir jugador",
     [ImpostorStrPresetRemove] = "Quitar jugador",
@@ -85,7 +88,8 @@ static const char *const k_es[ImpostorStrCount] = {
     [ImpostorStrManageDelete] = "Quitar",
     [ImpostorStrManageBack] = "Volver",
     [ImpostorStrPresetDeleteSaved] = "Borrar partida",
-    [ImpostorStrCreditsFooter] = "Flipper Zero",
+    [ImpostorStrCreditsRepoLine1] = "https://github.com/endika/",
+    [ImpostorStrCreditsRepoLine2] = "flipper-impostor-game",
 };
 
 ImpostorLocale impostor_locale_get(void) { return g_locale; }

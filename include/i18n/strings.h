@@ -31,6 +31,7 @@ typedef enum {
   ImpostorStrRoleImpostor,
   ImpostorStrRoleHintLabel,
   ImpostorStrRoleWordLabel,
+  ImpostorStrRoleCardFooter,
   ImpostorStrPresetPlayers,
   ImpostorStrPresetAdd,
   ImpostorStrPresetRemove,
@@ -44,7 +45,8 @@ typedef enum {
   ImpostorStrManageDelete,
   ImpostorStrManageBack,
   ImpostorStrPresetDeleteSaved,
-  ImpostorStrCreditsFooter,
+  ImpostorStrCreditsRepoLine1,
+  ImpostorStrCreditsRepoLine2,
   ImpostorStrCount,
 } ImpostorStrId;
 

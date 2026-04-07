@@ -1,6 +1,8 @@
 #include "include/app/impostor_app.h"
+#include "include/app/role_card_text.h"
 #include "include/domain/game_limits.h"
 #include "include/domain/game_rules.h"
+#include "include/domain/player_roster.h"
 #include "include/domain/session.h"
 #include "include/domain/word_bank.h"
 #include "include/i18n/strings.h"
@@ -12,6 +14,7 @@
 #include "include/version.h"
 #include <furi.h>
 #include <furi_hal_rtc.h>
+#include <gui/canvas.h>
 #include <gui/gui.h>
 #include <gui/modules/submenu.h>
 #include <gui/modules/text_input.h>
@@ -21,8 +24,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Flipper text_input_set_header_text stores the pointer without copying. */
 static char s_text_input_header[64];
+
+static SavedGameRecord s_saved_rec_scratch;
 
 #define PRESET_IDX_ADD 10u
 #define PRESET_IDX_REMOVE 11u
@@ -116,6 +120,12 @@ static void app_rebuild_preset_menu(ImpostorApp *app);
 static void app_rebuild_remove_menu(ImpostorApp *app);
 static void app_rebuild_manage_menu(ImpostorApp *app);
 static void app_start_from_preset(ImpostorApp *app);
+static bool app_session_begin_new_round(ImpostorApp *app);
+static void app_sync_locale_to_all_surfaces(ImpostorApp *app);
+
+static bool impostor_submenu_choice_valid(uint32_t index, uint8_t max_k) {
+  return index > 0u && index <= (uint32_t)max_k;
+}
 
 static void app_clamp_preset_impostors(ImpostorApp *app) {
   if (app->name_count < IMPOSTOR_MIN_PLAYERS) {
@@ -163,8 +173,8 @@ static void preset_menu_cb(void *context, uint32_t index) {
         app->editing_saved_slot >= app->saved_count) {
       return;
     }
-    if (saved_games_delete_at(app->editing_saved_slot)) {
-      saved_games_load(app->saved_list, &app->saved_count);
+    if (saved_games_delete_at(app->saved_list, &app->saved_count,
+                              app->editing_saved_slot)) {
       app->editing_saved_slot = IMPOSTOR_NO_SLOT;
       app_rebuild_games(app);
       app_switch(app, AppViewGames);
@@ -183,12 +193,7 @@ static void remove_player_cb(void *context, uint32_t index) {
     app_switch(app, AppViewSavedPreset);
     return;
   }
-  for (uint8_t j = (uint8_t)i; j + 1 < app->name_count; ++j) {
-    memcpy(app->pending.names[j], app->pending.names[j + 1],
-           IMPOSTOR_MAX_NAME_LEN);
-  }
-  memset(app->pending.names[app->name_count - 1], 0, IMPOSTOR_MAX_NAME_LEN);
-  app->name_count--;
+  player_roster_remove_at(app->pending.names, &app->name_count, (uint8_t)i);
   app_clamp_preset_impostors(app);
   app_rebuild_preset_menu(app);
   app_switch(app, AppViewSavedPreset);
@@ -245,13 +250,8 @@ static void manage_menu_cb(void *context, uint32_t index) {
   }
   if (app->name_count > IMPOSTOR_MIN_PLAYERS) {
     if (index == 1u) {
-      const uint8_t i = app->manage_player_idx;
-      for (uint8_t j = i; j + 1 < app->name_count; ++j) {
-        memcpy(app->pending.names[j], app->pending.names[j + 1],
-               IMPOSTOR_MAX_NAME_LEN);
-      }
-      memset(app->pending.names[app->name_count - 1], 0, IMPOSTOR_MAX_NAME_LEN);
-      app->name_count--;
+      player_roster_remove_at(app->pending.names, &app->name_count,
+                              app->manage_player_idx);
       app_rebuild_name_menu(app);
       app_switch(app, AppViewNameMenu);
       return;
@@ -295,24 +295,16 @@ static void app_start_from_preset(ImpostorApp *app) {
     return;
   }
   app->pending.player_count = app->name_count;
-  app->pending.word_index =
-      (uint16_t)(impostor_rng_u32(app) % (uint32_t)word_bank_word_count());
-  if (!session_begin(&app->session, &app->pending, impostor_rng_u32, app)) {
+  if (!app_session_begin_new_round(app)) {
     return;
   }
   if (app->editing_saved_slot != IMPOSTOR_NO_SLOT &&
       app->editing_saved_slot < app->saved_count) {
-    SavedGameRecord rec = {0};
-    rec.created_ts = app->saved_list[app->editing_saved_slot].created_ts;
-    rec.player_count = app->session.setup.player_count;
-    rec.impostor_count = app->session.setup.impostor_count;
-    rec.word_index = app->session.setup.word_index;
-    memcpy(rec.title, app->saved_list[app->editing_saved_slot].title,
-           sizeof(rec.title));
-    memcpy(rec.names, app->session.setup.names, sizeof(rec.names));
-    if (saved_games_replace_at(app->editing_saved_slot, &rec)) {
-      app->saved_list[app->editing_saved_slot] = rec;
-    }
+    saved_games_record_refresh_kept_meta(
+        &s_saved_rec_scratch, &app->saved_list[app->editing_saved_slot],
+        &app->session.setup);
+    saved_games_replace_at(app->saved_list, &app->saved_count,
+                           app->editing_saved_slot, &s_saved_rec_scratch);
   }
   app->save_on_play = false;
   app->games_wizard = false;
@@ -383,16 +375,7 @@ static void lang_cb(void *context, uint32_t index) {
   ImpostorApp *app = context;
   impostor_locale_set(index == 0u ? ImpostorLocaleEn : ImpostorLocaleEs);
   settings_save_locale(impostor_locale_get());
-  app_rebuild_home(app);
-  app_rebuild_games(app);
-  app_rebuild_settings(app);
-  app_rebuild_lang(app);
-  app_rebuild_name_menu(app);
-  app_rebuild_impostor(app);
-  app_rebuild_preset_menu(app);
-  app_rebuild_remove_menu(app);
-  app_build_credits(app);
-  app_build_ready(app);
+  app_sync_locale_to_all_surfaces(app);
   app_switch(app, AppViewSettings);
 }
 
@@ -426,7 +409,7 @@ static void impostor_cb(void *context, uint32_t index) {
   ImpostorApp *app = context;
   const uint8_t max_k = game_rules_max_impostors(app->name_count);
   if (app->impostor_pick_for_preset) {
-    if (index == 0u || index > (uint32_t)max_k) {
+    if (!impostor_submenu_choice_valid(index, max_k)) {
       return;
     }
     app->impostor_pick_for_preset = false;
@@ -436,14 +419,12 @@ static void impostor_cb(void *context, uint32_t index) {
     app_switch(app, AppViewSavedPreset);
     return;
   }
-  if (index == 0u || index > (uint32_t)max_k) {
+  if (!impostor_submenu_choice_valid(index, max_k)) {
     return;
   }
   app->pending.player_count = app->name_count;
   app->pending.impostor_count = (uint8_t)index;
-  app->pending.word_index =
-      (uint16_t)(impostor_rng_u32(app) % (uint32_t)word_bank_word_count());
-  if (!session_begin(&app->session, &app->pending, impostor_rng_u32, app)) {
+  if (!app_session_begin_new_round(app)) {
     return;
   }
   app->games_wizard = false;
@@ -510,14 +491,11 @@ static void ready_cb(GuiButtonType button, InputType type, void *context) {
   }
   ImpostorApp *app = context;
   if (app->save_on_play) {
-    SavedGameRecord rec = {0};
-    rec.created_ts = furi_hal_rtc_get_timestamp();
-    rec.player_count = app->session.setup.player_count;
-    rec.impostor_count = app->session.setup.impostor_count;
-    rec.word_index = app->session.setup.word_index;
-    strlcpy(rec.title, app->game_title, sizeof(rec.title));
-    memcpy(rec.names, app->session.setup.names, sizeof(rec.names));
-    saved_games_append(&rec);
+    saved_games_record_from_setup(&s_saved_rec_scratch, &app->session.setup,
+                                  furi_hal_rtc_get_timestamp(),
+                                  app->game_title);
+    saved_games_append(app->saved_list, &app->saved_count,
+                       &s_saved_rec_scratch);
   }
   app_open_pass(app);
 }
@@ -636,10 +614,15 @@ static void app_rebuild_impostor(ImpostorApp *app) {
 
 static void app_build_credits(ImpostorApp *app) {
   widget_reset(app->credits);
-  snprintf(app->big_buf, sizeof(app->big_buf), "%s%s\n%s",
-           impostor_str(ImpostorStrCreditsBody), APP_VERSION,
-           impostor_str(ImpostorStrCreditsFooter));
-  widget_add_text_scroll_element(app->credits, 0, 0, 128, 64, app->big_buf);
+  snprintf(app->big_buf, sizeof(app->big_buf), "%s%s",
+           impostor_str(ImpostorStrCreditsBody), APP_VERSION);
+  widget_add_text_scroll_element(app->credits, 0, 0, 128, 46, app->big_buf);
+  widget_add_string_element(app->credits, 64, 48, AlignCenter, AlignTop,
+                            FontSecondary,
+                            impostor_str(ImpostorStrCreditsRepoLine1));
+  widget_add_string_element(app->credits, 64, 56, AlignCenter, AlignTop,
+                            FontSecondary,
+                            impostor_str(ImpostorStrCreditsRepoLine2));
 }
 
 static void app_build_ready(ImpostorApp *app) {
@@ -698,20 +681,28 @@ static void app_open_pass(ImpostorApp *app) {
 }
 
 static void app_show_card(ImpostorApp *app) {
-  const char *word = NULL;
-  const char *hint = NULL;
-  word_bank_get_pair(app->session.setup.word_index, impostor_locale_get(),
-                     &word, &hint);
-  if (session_reveal_is_impostor(&app->session)) {
-    snprintf(app->card_buf, sizeof(app->card_buf), "\e#%s\e#\n\n%s\n%s",
-             impostor_str(ImpostorStrRoleImpostor),
-             impostor_str(ImpostorStrRoleHintLabel), hint);
-  } else {
-    snprintf(app->card_buf, sizeof(app->card_buf), "%s\n\n\e#%s\e#",
-             impostor_str(ImpostorStrRoleWordLabel), word);
-  }
+  role_card_format(app->card_buf, sizeof(app->card_buf), &app->session);
   card_view_set_text(app->card, app->card_buf);
   app_switch(app, AppViewCard);
+}
+
+static bool app_session_begin_new_round(ImpostorApp *app) {
+  app->pending.word_index =
+      (uint16_t)(impostor_rng_u32(app) % (uint32_t)word_bank_word_count());
+  return session_begin(&app->session, &app->pending, impostor_rng_u32, app);
+}
+
+static void app_sync_locale_to_all_surfaces(ImpostorApp *app) {
+  app_rebuild_home(app);
+  app_rebuild_games(app);
+  app_rebuild_settings(app);
+  app_rebuild_lang(app);
+  app_rebuild_name_menu(app);
+  app_rebuild_impostor(app);
+  app_rebuild_preset_menu(app);
+  app_rebuild_remove_menu(app);
+  app_build_credits(app);
+  app_build_ready(app);
 }
 
 static bool app_nav(void *context) {

@@ -5,8 +5,10 @@ App(
     sources=[
         "main.c",
         "src/app/impostor_app.c",
+        "src/app/role_card_text.c",
         "src/i18n/strings.c",
         "src/domain/game_rules.c",
+        "src/domain/player_roster.c",
         "src/domain/session.c",
         "src/domain/word_bank.c",
         "src/infrastructure/settings_storage.c",

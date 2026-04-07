@@ -9,13 +9,14 @@ PWD = $(shell pwd)
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -I.
 
-.PHONY: all help test test_strings test_game_rules test_session prepare fap clean clean_firmware format linter
+.PHONY: all help test test_strings test_game_rules test_session test_player_roster \
+	prepare fap clean clean_firmware format linter
 
 all: test
 
 help:
 	@echo "Targets for $(PROJECT_NAME):"
-	@echo "  make test           - Host unit tests"
+	@echo "  make test           - Host unit tests (strings, game_rules, session, player_roster)"
 	@echo "  make prepare        - Symlink app into firmware applications_user"
 	@echo "  make fap            - Clean firmware build + compile .fap"
 	@echo "  make format         - clang-format"
@@ -37,12 +38,14 @@ linter:
 		--suppress=unusedFunction:main.c \
 		--suppress=constParameterCallback \
 		src/i18n/strings.c src/domain/game_rules.c src/domain/session.c \
-		src/domain/word_bank.c src/app/impostor_app.c \
+		src/domain/word_bank.c src/domain/player_roster.c \
+		src/app/impostor_app.c src/app/role_card_text.c \
 		src/infrastructure/saved_games.c src/infrastructure/settings_storage.c \
 		src/ui/pass_view.c src/ui/card_view.c src/platform/random_port.c main.c \
-		tests/test_strings.c tests/test_game_rules.c tests/test_session.c
+		tests/test_strings.c tests/test_game_rules.c tests/test_session.c \
+		tests/test_player_roster.c
 
-test: test_strings test_game_rules test_session
+test: test_strings test_game_rules test_session test_player_roster
 
 test_strings: strings.o tests/test_strings.o
 	$(CC) $(CFLAGS) -o test_strings strings.o tests/test_strings.o
@@ -74,6 +77,17 @@ session.o: src/domain/session.c include/domain/session.h include/domain/game_rul
 tests/test_session.o: tests/test_session.c include/domain/session.h
 	$(CC) $(CFLAGS) -c tests/test_session.c -o tests/test_session.o
 
+test_player_roster: player_roster.o tests/test_player_roster.o
+	$(CC) $(CFLAGS) -o test_player_roster player_roster.o tests/test_player_roster.o
+	./test_player_roster
+
+player_roster.o: src/domain/player_roster.c include/domain/player_roster.h \
+		include/domain/game_limits.h
+	$(CC) $(CFLAGS) -c src/domain/player_roster.c -o player_roster.o
+
+tests/test_player_roster.o: tests/test_player_roster.c include/domain/player_roster.h
+	$(CC) $(CFLAGS) -c tests/test_player_roster.c -o tests/test_player_roster.o
+
 prepare:
 	@if [ -d "$(FLIPPER_FIRMWARE_PATH)" ]; then \
 		mkdir -p $(FLIPPER_FIRMWARE_PATH)/applications_user; \
@@ -94,4 +108,4 @@ fap: prepare clean_firmware clean
 	fi
 
 clean:
-	rm -f *.o tests/*.o test_strings test_game_rules test_session
+	rm -f *.o tests/*.o test_strings test_game_rules test_session test_player_roster

@@ -2,9 +2,37 @@
 #include "include/domain/game_limits.h"
 #include <furi.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <storage/storage.h>
 #include <string.h>
+
+void saved_games_record_from_setup(SavedGameRecord *out, const GameSetup *setup,
+                                   uint32_t created_ts, const char *title) {
+  if (!out || !setup) {
+    return;
+  }
+  memset(out, 0, sizeof(*out));
+  out->created_ts = created_ts;
+  out->player_count = setup->player_count;
+  out->impostor_count = setup->impostor_count;
+  out->word_index = setup->word_index;
+  snprintf(out->title, sizeof(out->title), "%s", title ? title : "");
+  memcpy(out->names, setup->names, sizeof(out->names));
+}
+
+void saved_games_record_refresh_kept_meta(SavedGameRecord *out,
+                                          const SavedGameRecord *meta_from,
+                                          const GameSetup *setup) {
+  if (!out || !meta_from || !setup) {
+    return;
+  }
+  memset(out, 0, sizeof(*out));
+  out->created_ts = meta_from->created_ts;
+  memcpy(out->title, meta_from->title, sizeof(out->title));
+  out->player_count = setup->player_count;
+  out->impostor_count = setup->impostor_count;
+  out->word_index = setup->word_index;
+  memcpy(out->names, setup->names, sizeof(out->names));
+}
 
 #define APPS_DATA_DIR "/ext/apps_data/impostor_game"
 #define GAMES_PATH APPS_DATA_DIR "/games.bin"
@@ -163,83 +191,60 @@ bool saved_games_load(SavedGameRecord *out, uint8_t *count_out) {
   return true;
 }
 
-bool saved_games_append(const SavedGameRecord *record) {
-  if (!record) {
+bool saved_games_append(SavedGameRecord *list, uint8_t *count_io,
+                        const SavedGameRecord *record) {
+  if (!list || !count_io || !record) {
     return false;
   }
 
-  SavedGameRecord *existing =
-      malloc(sizeof(SavedGameRecord) * IMPOSTOR_MAX_SAVED_GAMES);
-  if (!existing) {
-    return false;
+  if (!saved_games_load(list, count_io)) {
+    *count_io = 0;
   }
 
-  uint8_t count = 0;
-  if (!saved_games_load(existing, &count)) {
-    count = 0;
-  }
-
+  uint8_t count = *count_io;
   if (count >= IMPOSTOR_MAX_SAVED_GAMES) {
-    memmove(&existing[0], &existing[1],
+    memmove(&list[0], &list[1],
             (size_t)(sizeof(SavedGameRecord) * (IMPOSTOR_MAX_SAVED_GAMES - 1)));
     count = IMPOSTOR_MAX_SAVED_GAMES - 1;
   }
 
-  existing[count] = *record;
+  list[count] = *record;
   count++;
-
-  const bool ok = saved_games_write_all(existing, count);
-  free(existing);
-  return ok;
+  *count_io = count;
+  return saved_games_write_all(list, count);
 }
 
-bool saved_games_replace_at(uint8_t index, const SavedGameRecord *record) {
-  if (!record) {
+bool saved_games_replace_at(SavedGameRecord *list, uint8_t *count_io,
+                            uint8_t index, const SavedGameRecord *record) {
+  if (!list || !count_io || !record) {
     return false;
   }
 
-  SavedGameRecord *existing =
-      malloc(sizeof(SavedGameRecord) * IMPOSTOR_MAX_SAVED_GAMES);
-  if (!existing) {
+  if (!saved_games_load(list, count_io)) {
     return false;
   }
-
-  uint8_t count = 0;
-  if (!saved_games_load(existing, &count)) {
-    free(existing);
+  if (index >= *count_io) {
     return false;
   }
-  if (index >= count) {
-    free(existing);
-    return false;
-  }
-  existing[index] = *record;
-  const bool ok = saved_games_write_all(existing, count);
-  free(existing);
-  return ok;
+  list[index] = *record;
+  return saved_games_write_all(list, *count_io);
 }
 
-bool saved_games_delete_at(uint8_t index) {
-  SavedGameRecord *existing =
-      malloc(sizeof(SavedGameRecord) * IMPOSTOR_MAX_SAVED_GAMES);
-  if (!existing) {
+bool saved_games_delete_at(SavedGameRecord *list, uint8_t *count_io,
+                           uint8_t index) {
+  if (!list || !count_io) {
     return false;
   }
 
-  uint8_t count = 0;
-  if (!saved_games_load(existing, &count)) {
-    free(existing);
+  if (!saved_games_load(list, count_io)) {
     return false;
   }
-  if (index >= count) {
-    free(existing);
+  if (index >= *count_io) {
     return false;
   }
-  for (uint8_t i = index; i + 1u < count; ++i) {
-    existing[i] = existing[i + 1u];
+  for (uint8_t i = index; i + 1u < *count_io; ++i) {
+    list[i] = list[i + 1u];
   }
-  count--;
-  const bool ok = saved_games_write_all(existing, count);
-  free(existing);
-  return ok;
+  (*count_io)--;
+  return saved_games_write_all(list, *count_io);
 }
