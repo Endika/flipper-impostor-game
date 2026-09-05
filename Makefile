@@ -33,7 +33,7 @@ format:
 	clang-format -i $(FORMAT_FILES)
 
 linter:
-	cppcheck --enable=all --inline-suppr --error-exitcode=1 -I. \
+	cppcheck --enable=all --check-level=exhaustive --inline-suppr --error-exitcode=1 -I. \
 		--suppress=missingIncludeSystem \
 		--suppress=unusedFunction:main.c \
 		--suppress=constParameterCallback \
