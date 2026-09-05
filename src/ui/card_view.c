@@ -20,7 +20,7 @@ struct CardView {
 };
 
 static void card_draw_callback(Canvas *canvas, void *model) {
-  const CardModel *m = model;
+  CardModel *m = model;
   canvas_clear(canvas);
   canvas_set_font(canvas, FontPrimary);
   elements_multiline_text_aligned(canvas, 64, 4, AlignCenter, AlignTop,
