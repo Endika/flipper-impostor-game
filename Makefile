@@ -32,11 +32,18 @@ endif
 format:
 	clang-format -i $(FORMAT_FILES)
 
+# constParameterCallback suppression: pass_input_callback and card_input_callback are assigned to
+# view_set_input_callback, whose ViewInputCallback is `bool (*)(InputEvent*, void*)`. They only read
+# the event, so cppcheck asks for `const InputEvent *` — but that signature no longer matches the SDK
+# typedef and the FAP build fails with -Werror=incompatible-pointer-types, so the only way to take
+# the advice would be a function-pointer cast at both registrations. The advice cannot be applied;
+# it is not a latent bug. Scoped to src/ui/ rather than repo-wide: the draw callbacks used to be
+# reported too and are fixed, their model locals no longer carry a redundant const.
 linter:
 	cppcheck --enable=all --check-level=exhaustive --inline-suppr --error-exitcode=1 -I. \
 		--suppress=missingIncludeSystem \
 		--suppress=unusedFunction:main.c \
-		--suppress=constParameterCallback \
+		--suppress=constParameterCallback:src/ui/*_view.c \
 		src/i18n/strings.c src/domain/game_rules.c src/domain/session.c \
 		src/domain/word_bank.c src/domain/player_roster.c \
 		src/app/impostor_app.c src/app/role_card_text.c \
