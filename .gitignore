@@ -1,7 +1,7 @@
 # Host unit tests (make test)
 *.o
 tests/*.o
-test_strings
+/test_*
 
 # ufbt / GitHub Actions release build
 dist/
